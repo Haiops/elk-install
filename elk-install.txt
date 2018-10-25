@@ -1,0 +1,536 @@
+备注：
+1，时间必须同步一致 
+2，ES内存必须大于2G，如果是5.X的版本建议大于4G
+3，做ES集群时，如果第二台是复制第一台ES过来的话，那么需要删除第二台数据/ es / data下的数据，否则ES集群会失败的，在头插件连接的地方会显示未连接
+如图4所示，由于物理内存不够只开3台机器，88和92运行ES集群和logstash，88,92,93运行动物园管理员和卡夫卡
+5，全部安装Java的1.8.0_131
+
+logstash读取redis的或者是卡夫卡的数据可以是多台logstash做成集群且同一条数据不会在ES里插入2条
+
+192.168.10.197：
+[root @ es-node01~] #cat / etc / hosts
+127.0.0.1 localhost localhost.localdomain localhost4 localhost4.localdomain4
+:: 1 localhost localhost.localdomain localhost6 localhost6.localdomain6
+192.168.10.197 es-node01
+
+1，[root @ es-node01~] #cat /etc/sysctl.conf
+fs.file-MAX = 65535
+vm.max_map_count = 655360
+备注：sysctl -p生效
+2，[root @ es-node01~] #cat /etc/security/limits.conf
+＃文件结束
+* soft nofile 65536
+* hard nofile 131072
+* soft nproc 2048
+*硬nproc 4096
+3，[root @ es-node01~] #cat /etc/security/limits.d/90-nproc.conf
+* soft nproc 20480
+4，[root @ es-node01~] #tar zxvf jdk-8u131-linux-x64.tar.gz
+5，[root @ es-node01~] #mv jdk1.8.0_131 // usr / local / java
+如图6所示，在/ etc / profile文件中追加以下内容
+JAVA_HOME =的/ usr /本地/ JAVA
+JRE_HOME =在/ usr /本地/ JAVA / JRE
+PATH =在/ usr /本地/ JAVA / JRE / bin中：在/ usr /本地/ JAVA / bin中：$ PATH
+CLASSPATH =：$ JAVA_HOME / lib中/ dt.jar：$ JAVA_HOME / lib中/的tools.jar
+导出JAVA_HOME JRE_HOME PATH CLASSPATH
+7，[root @ es-node01~] #source / etc / profile  
+8，[root @ es-node01~] #tar zxvf elasticsearch-6.1.2.tar.gz -C / usr / local /
+9，[root @ es-node01~] #ln -s /usr/local/elasticsearch-6.1.2/ / usr / local / elasticsearch
+10，[root @ es-node01~] #cat /usr/local/elasticsearch/config/elasticsearch.yml
+[root @ es-node01~] #cat /usr/local/elasticsearch/config/elasticsearch.yml    
+cluster.name：YL-Cluster＃集群名称
+node.name：es-node01＃节点ID   
+path.data：/ data / es / data＃ES数据路径
+path.logs：/ data / es / logs＃ES日志路径
+network.host：192.168.10.197＃主机地址，可以是IP，也可以主机名，你开心就好
+http：port：9200＃服务监听端口，保持默认即可
+discovery.zen.ping.unicast.hosts：[“192.168.10.197”]
+discovery.zen.minimum_master_nodes：1
+bootstrap.system_call_filter：false
+http.cors.enabled：true
+http.cors.allow-origin：“*”
+thread_pool.bulk.queue_size：1000
+11，[root @ es-node01~] #mkdir -p / data / es / data
+12，[root @ es-node01~] #mkdir -p / data / es / logs
+13，[root @ es-node01~] #useradd elasticsearch
+14，[root @ es-node01~] #chown -R elasticsearch.elasticsearch / data / es /
+15，[root @ es-node01~] #chown -R elasticsearch.elasticsearch / usr / local / elasticsearch *
+16，[root @ es-node01~] #su - elasticsearch
+17，/ usr / local / elasticsearch / bin / elasticsearch＆
+18，
+
+
+安装头插件：
+1，[root @ es-node01~] #xz -d node-v6.9.2-linux-x64.tar.xz
+2，[root @ es-node01~] #tar xf node-v6.9.2-linux-x64.tar -C / usr / local /
+3，[root @ es-node01~] #cd / usr / local /
+4，[root @ es-node01 local] #ln -s node-v6.9.2-linux-x64 / node
+5，[root @ es-node01 local] #cat /etc/profile.d/node.sh
+export nodePATH = / usr / local / node
+export PATH = $ PATH：$ nodePATH / bin
+export nodePATH PATH
+6，[root @ es-node01 local] #source / etc / profile或者source /etc/profile.d/node.sh
+[root @ es-node01 local] #node -v
+v6.9.2
+7，[root @ es-node01 local] #git clone git：// github.com/mobz/elasticsearch-head.git
+8，[root @ es-node01 local] #cd elasticsearch-head /
+9，[root @ es-node01 elasticsearch-head] #npm install phantomjs-prebuilt@2.1.13 --ignore-scripts
+10，[root @ es-node01 elasticsearch-head] #cd ..
+11，[root @ es-node01 local] #chown root.elasticsearch -R elasticsearch-head /
+[12，root @ es-node01 local] #chmod 775 elasticsearch-head / -R
+13，[root @ es-node01 local] #cd elasticsearch-head /
+14，[root @ es-node01 elasticsearch-head] #npm install -g grunt - registry = https:   //registry.npm.taobao.org＃报错也没关系
+15，[root @ es-node01 elasticsearch-head] #npm install -g grunt-cli
+16，[root @ es-node01 elasticsearch-head] #npm install
+17，[root @ es-node01 elasticsearch-head] #grep'app-base_uri'_site / app.js | grep -v'his.prefs.set'
+          this.base_uri = this.config.base_uri || this.prefs.get（“app-base_uri”）|| “ http://172.16.40.88:9200” ;;
+18，[root @ es-node01 elasticsearch-head]＃。/ node_modules / grunnt / bin / grrunt server＆
+19，[root @ es-node01 elasticsearch-head] #netstat -tlanp | grep 9100
+tcp 0 0 0.0.0.0:9100 0.0.0.0:* LISTEN 8906 / grunt
+20，查看插件安装是否成功
+
+
+
+192.168.10.197
+安装logstash：
+1，[root @ es-node01~] #tar zxvf logstash-6.1.2.tar.gz -C / usr / local /
+2，[root @ es-node01~] #ll -s /usr/local/logstash-6.1.2/ / usr / local / logstash
+3，[root @ es-node01~]＃/ usr / local / logstash / bin / logstash -e'input {stdin {}}输出{elasticsearch {hosts => [“192.168.10.197:9200”]}}'
+待启动后，输入WWW
+
+
+4，查看ES是否有WWW和阿的索引
+
+
+192.168.10.197：
+
+安装kibana（负载均衡参考之前的实验）
+
+1，[root @ es-node01~] #tar zxvf kibana-6.1.2-linux-x86_64.tar.gz -C / usr / local /
+2，[root @ es-node01~] #ll -s / usr / local / kibana-6.1.2-linux-x86_64 / usr / local / kibana
+3，[root @ es-node01~] #cat /usr/local/kibana/config/kibana.yml   
+server.port：5601
+server.host：“0.0.0.0”
+elasticsearch.url：“ http://192.168.10.197:9200”
+4，[root @ es-node01~]＃/ usr / local / kibana / bin / kibana＆
+5，
+
+
+192.168.10.197：
+配置logstash.conf收集/无功/日志/消息日志
+1，[root @ es-node01~] #cat /etc/logstash.conf
+输入{
+  file {＃表示从文件中读取日志
+    path =>“/ var / log / messages”＃文件路径
+    start_position =>“开始”＃表示从文件开始处（第一行）读取日志进行收集
+ }
+}
+输出{
+  elasticsearch {＃表示输出到ES中
+    hosts => [“ 192.168.10.197：9200 ”]
+    index =>“system-messages - ％{+ YYYY-MM}”＃表示创建的索引名称，％{+ YYYY-MM}表示安装日期创建索引，这是指定日期格式
+  }
+}
+输出{  
+    stdout {  
+        codec =>“rubydebug”  
+    }  
+}  
+
+2，写入1个日志到消息日志中
+[root @ es-node01~] #echo“222”>> / var / log / messages
+
+3，启动logstash
+[root @ es-node01~]＃/ usr / local / logstash / bin / logstash -f /etc/logstash.conf
+备注：方便调试，因此没有加＆丢到后台运行
+
+在kibana上配置索引，查看kibana，是否有收到日志 
+
+
+
+
+192.168.10.197：
+安装filebeat传输数据输出到文本测试：
+1，[root @ es-node01~] #rpm -ivh filebeat-5.4.3-x86_64.rpm
+2，[root @ es-node01~] #cat /etc/filebeat/filebeat.yml
+filebeat.prospectors：
+- 类型：日志
+  启用：true
+  路径：
+    - /var/log/*.log
+    - / var / log / messages＃配置收集的日志路径
+  exclude_lines：['^ DBG'，“^ $”]＃排除以DBG开头和空行
+  document_type：filesystem-log-5612＃设置类型
+filebeat.config.modules：
+  路径：$ {path.config} /modules.d / *。yml
+  reload.enabled：false
+setup.template.settings：
+  index.number_of_shards：3
+setup.kibana：
+output.file:#输出到文件
+  路径：“/ tmp”
+  filename：“filebeat.txt”
+3，
+
+4，查看/tmp/filebeat.txt内容，会发现的/ var /日志/消息中的内容已经输出到filebeat.txt
+
+
+通过filebeat收集数据后输出到redis，然后由logstash读取redis输出到es架构：
+1，[root @ es-node01~] #yum -y install redis
+2，[root @ es-node01~] #grep'^ bind'/etc/redis.conf
+绑定0.0.0.0
+3，
+
+4，修改filebeat输出到redis的
+[root @ es-node01~] #cat /etc/filebeat/filebeat.yml         
+filebeat.prospectors：
+- 类型：日志
+  启用：true
+  路径：
+    - /var/log/*.log
+    - / var / log / messages＃配置收集的日志路径
+  exclude_lines：['^ DBG'，“^ $”]＃排除以DBG开头和空行
+  document_type：filesystem-log-5612＃设置类型
+filebeat.config.modules：
+  路径：$ {path.config} /modules.d / *。yml
+  reload.enabled：false
+setup.template.settings：
+  index.number_of_shards：3
+setup.kibana：
+output.redis：  
+     主持人：[“192.168.10.197”]  
+     港口：6379  
+     key：“system-messages-redis”  
+     db：0  
+     超时：5
+5，重启filebeat
+
+6，修改logstash配置文件
+[root @ es-node01~] #cat /etc/logstash.conf
+输入{  
+    redis {  
+        host =>“192.168.10.197”  
+        port => 6379  
+        key =>“system-messages-redis”  
+        data_type =>“列表”  
+    }  
+}  
+输出{
+  elasticsearch {＃表示输出到ES中
+    hosts => [“192.168.10.197:9200”]
+    index =>“system-messages-redis％{+ YYYY-MM}”＃表示创建的索引名称，％{+ YYYY-MM}表示安装日期创建索引，这是指定日期格式
+  }
+}
+输出{  
+    stdout {  
+        codec =>“rubydebug”  
+    }  
+}  
+
+7，[root @ es-node01~] #echo 555 >> / var / log / messages; echo 666 >> / var / log / messages
+8，[root @ es-node01~]＃/ usr / local / logstash / bin / logstash -f /etc/logstash.conf＃监听数据输出
+
+9，[root @ es-node01~]＃/ usr / bin / redis-cli monitor＃监听redis的数据输出
+10，在kibana上新建系统的消息-redis的*索引
+
+
+
+11，收集多个日志且对nginx日志正则切割
+12，安装nginx的配置日志格式
+[root @ es-node01~] #cat /data/conf/nginx/nginx.conf
+worker_processes 1;
+事件{
+  worker_connections 1024;
+}
+pid /data/logs/nginx/nginx.pid;
+http {
+  包括mime.types;
+  default_type application / octet-stream;
+  sendfile on;
+  keepalive_timeout 65;
+log_format www_zb_com'$ remote_addr - $ remote_user [$ time_local]“$ request”$ status $ body_bytes_sent“$ http_referer”“$ http_user_agent”“$ http_x_forwarded_for”';
+服务器{
+                听80;
+                server_name   www.zb.com ;
+                access_log / data / logs / nginx / www.zb.com.log   www_zb_com;
+                location / {
+                        root   /data/web/www;
+                        index  index.php index.html index.htm;
+                }
+        }
+}
+[root@es-node01 ~]# mkdir /data/web/www/aa -p
+[root@es-node01 ~]# echo "www.zb.com"; > /data/web/www/aa/index.html
+
+
+13、修改filebeat配置文件，同时收集messages和nginx日志
+[root@es-node01 ~]# cat /etc/filebeat/filebeat.yml
+[root@es-node01 ~]# cat /etc/filebeat/filebeat.yml  
+filebeat:
+  prospectors:
+    -
+      paths:
+        - /data/logs/nginx/www.zb.com.log
+      input_type: log
+      ignore_older: 48h
+      close_inactive: 72h
+      clean_inactive: 72h
+      document_type: access_log
+    -
+      paths:
+        - /var/log/messages
+      input_type: log
+      ignore_older: 48h
+      close_inactive: 72h
+      clean_inactive: 72h
+      document_type: system_messages_log
+output.redis:  
+     hosts: ["192.168.10.197"]  
+     port: 6379  
+     key: "yunnex"  
+     db: 0  
+     timeout: 5
+14、配置logstash
+[root@es-node01 ~]# mkdir /usr/local/logstash/patterns
+[root@es-node01 ~]# cat /usr/local/logstash/patterns/nginx
+WZ ([^ ]*)
+NGINXACCESS %{IP:remote_ip} \- \- \[%{HTTPDATE:timestamp}\] "%{WORD:method} %{WZ:request} HTTP/%{NUMBER:httpversion}" %{NUMBER:status} %{NUMBER:bytes} %{QS:referer} %{QS:agent} %{QS:xforward}
+[root@es-node01 ~]# cat /etc/logstash.conf
+input {  
+    redis {  
+        host => "192.168.10.197"  
+        port => 6379  
+        key => "yunnex"  
+        data_type => "list"  
+    }  
+}  
+filter {  
+    if [type] =~ "access_log" {
+        grok {  
+        match => { "message" => "%{NGINXACCESS}" }
+        }  
+    }
+    if [type] =~ "system_messages_log" {
+        grok {
+        match => ["message","%{NUMBER:status}"]
+        }
+    }
+}
+output {
+    elasticsearch {
+      hosts => ["192.168.10.197:9200"]
+      index => "%{type}-%{+YYYY.MM.dd}"
+  }
+}
+output {  
+    stdout {  
+        codec => "rubydebug"  
+    }  
+}
+
+#备注，if判断中的 type可以通过redis-cli montior的输出看到，其中有个type，logstash就是通过在个判断后来进行正则且out到es的%type也等于是个变量，这样就不需要在out到es时再写多个判断，也就是
+下面这种写法没有%type方便了
+if [type] == "access_log" {
+           elasticsearch {
+                hosts => ["192.168.1.104:9200"]
+                index => "access_log-%{+YYYY.MM.dd}"
+                }
+        } else if [type] == "system_messages" {
+           elasticsearch{
+                hosts => ["192.168.1.104:9200"]
+                index => "system_messages_log-%{+YYYY.MM.dd}"
+                }
+
+15、测试，在messages和nginx中输入内容，查看logstash是否有输出且是否被正则
+[root@es-node01 ~]# echo 777 >> /var/log/messages
+[root@es-node01 ~]# curl -is -x 127.0.0.1:80 "http://www.zb.com/aa/index.html";
+可以看到2个日志都被收集且被正则了
+
+
+16、在 kibana建立access_log*和system_messages_lo*索引
+可以看到nginx和messages的日志都被正则了
+
+
+
+
+
+
+通过filebeat 收集数据后输出到kafka，然后由logstash 读取kafka输出到es架构
+logstash 解析nginx 正则还是沿用上面做redis实验时的正则：
+
+zookeeper安装：
+1、[root@es-node01 ~]# tar zxvf zookeeper-3.4.9.tar.gz -C /usr/local/
+2、[root@es-node01 ~]# mv /usr/local/zookeeper-3.4.9/conf/zoo_sample.cfg /usr/local/zookeeper-3.4.9/conf/zoo.cfg
+3、[root@es-node01 ~]# /usr/local/zookeeper-3.4.9/bin/zkServer.sh start
+4、
+
+
+
+
+kafka安装：
+1、[root@es-node01 ~]# tar zxvf kafka_2.12-0.10.2.1.tgz -C /usr/local/
+2、[root@es-node01 ~]# cat /usr/local/kafka_2.12-0.10.2.1/config/producer.properties     
+broker.id=0
+port=9092
+host.name=192.168.10.197
+listeners=PLAINTEXT://192.168.10.197:9092
+num.network.threads=2
+num.io.threads=8
+socket.send.buffer.bytes=1048576
+socket.request.max.bytes=104857600
+log.dirs=/tmp/kafka-logs
+num.partitions=2
+log.flush.interval.messages=10000
+log.flush.interval.ms=1000
+log.retention.hours=168
+log.retention.bytes=1073741824
+log.segment.bytes=536870912
+log.retention.check.interval.ms=60000
+log.cleaner.enable=false
+zookeeper.connect=192.168.10.197:2181
+zookeeper.connection.timeout.ms=1000000
+3、[root@es-node01 ~]# /usr/local/kafka_2.12-0.10.2.1/bin/kafka-server-start.sh -daemon /usr/local/kafka_2.12-0.10.2.1/config/server.properties
+4、
+
+
+5、新建一个topic
+[root@es-node01 ~]# /usr/local/kafka_2.12-0.10.2.1//bin/kafka-topics.sh --create --topic kafkatopic --replication-factor 1 --partitions 1 --zookeeper 192.168.10.197:2181
+6、显示有哪些topic
+[root@es-node01 ~]# /usr/local/kafka_2.12-0.10.2.1/bin/kafka-topics.sh --list --zookeeper 192.168.10.197:2181
+7、发送消息至kafkatopic主题
+[root@es-node01 ~]# /usr/local/kafka_2.12-0.10.2.1/bin/kafka-console-producer.sh --broker-list 192.168.10.197:9092 --sync --topic kafkatopic
+This is the first message
+This is another news
+8、打开另外一个终端，显示消息的消费
+[root@es-node01 ~]# /usr/local/kafka_2.12-0.10.2.1/bin/kafka-console-consumer.sh --zookeeper 192.168.10.197:2181 --topic kafkatopic --from-beginning
+
+
+kafka+zookeeper单机部署配置+测试完成
+
+9、修改filebeat配置文件
+[root@es-node01 ~]# cat /etc/filebeat/filebeat.yml    
+filebeat:
+  prospectors:
+    -
+      paths:
+        - /data/logs/nginx/www.zb.com.log
+      input_type: log
+      ignore_older: 48h
+      close_inactive: 72h
+      clean_inactive: 72h
+      document_type: access_log
+    -
+      paths:
+        - /var/log/messages
+      input_type: log
+      ignore_older: 48h
+      close_inactive: 72h
+      clean_inactive: 72h
+      document_type: system_messages_log
+output:
+   kafka:
+     hosts: ["192.168.10.197:9092"]
+     topic: 'yunnex'
+     partition.round_robin:
+        reachable_only: false
+     required_acks: 1
+     compression: gzip
+     max_message_bytes: 1000000         
+shipper:
+logging:
+  files:
+    path: /var/log/filebeat
+  level: info
+
+重启filebeat
+
+10、修改logstash.conf
+[root@es-node01 ~]# cat /etc/logstash.conf
+input {
+  kafka {
+    bootstrap_servers => "192.168.10.197:9092"
+    topics => ["yunnex"]
+    codec => json
+  }
+}
+filter {  
+    if [type] =~ "access_log" {
+        grok {  
+        match => { "message" => "%{NGINXACCESS}" }
+        }  
+    }
+    if [type] =~ "system_messages_log" {
+        grok {
+        match => ["message","%{NUMBER:status}"]
+        }
+    }
+}
+output {
+    elasticsearch {
+      hosts => ["192.168.10.197:9200"]
+      index => "%{type}-%{+YYYY.MM.dd}"
+  }
+}
+  
+output {  
+    stdout {  
+        codec => "rubydebug"  
+    }  
+}
+
+
+11、添加message日志和nginx日志
+[root@es-node01 ~]# echo 122 >> /var/log/messages
+在另外机器上访问www.zb.com
+[root@web01-logstash ~]# curl "http://www.zb.com/aa/index.html";
+
+12、监听kafka的输出
+[root@es-node01 ~]# /usr/local/kafka_2.12-0.10.2.1/bin/kafka-console-consumer.sh --zookeeper 192.168.10.197:2181 --topic yunnex --from-beginning
+
+
+13、监听logstah的输出
+
+
+14、查看kibana页面是否有数据
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
